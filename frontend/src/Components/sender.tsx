@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 
 export const Sender = () => {
     const [socket, setSocket] = useState<WebSocket | null>(null);
+    // const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [pc, setPC] = useState<RTCPeerConnection | null>(null);
 
     useEffect(() => {
@@ -64,18 +65,18 @@ pc.ontrack = (event) => {
   socket.send(JSON.stringify({ type: "createOffer", sdp: pc.localDescription }));
 };
 
-    const getCameraStreamAndSend = (pc: RTCPeerConnection) => {
-        navigator.mediaDevices.getUserMedia({ video: true, audio:true }).then((stream) => {
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.play();
-            // this is wrong, should propogate via a component
-            document.body.appendChild(video);
-            stream.getTracks().forEach((track) => {
-                pc?.addTrack(track);
-            });
-        });
-    }
+    // const getCameraStreamAndSend = (pc: RTCPeerConnection) => {
+    //     navigator.mediaDevices.getUserMedia({ video: true, audio:true }).then((stream) => {
+    //         const video = document.createElement('video');
+    //         video.srcObject = stream;
+    //         video.play();
+    //         // this is wrong, should propogate via a component
+    //         document.body.appendChild(video);
+    //         stream.getTracks().forEach((track) => {
+    //             pc?.addTrack(track);
+    //         });
+    //     });
+    // }
     
 
     return <div>

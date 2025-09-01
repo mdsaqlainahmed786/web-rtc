@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 function Receiver() {
+  //
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);

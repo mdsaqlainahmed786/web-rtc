@@ -14,44 +14,55 @@ export const Sender = () => {
         }
     }, []);
 
-    const initiateConn = async () => {
+// Sender.tsx
+const initiateConn = async () => {
+  if (!socket) return;
 
-        if (!socket) {
-            alert("Socket not found");
-            return;
-        }
+  const pc = new RTCPeerConnection();
+  setPC(pc);
 
-        socket.onmessage = async (event) => {
-            const message = JSON.parse(event.data);
-            if (message.type === 'createAnswer') {
-                await pc.setRemoteDescription(message.sdp);
-            } else if (message.type === 'iceCandidate') {
-                pc.addIceCandidate(message.candidate);
-            }
-        }
+pc.ontrack = (event) => {
+  const remoteVideo = document.createElement("video");
+  remoteVideo.srcObject = event.streams[0]; // ✅ includes audio
+  remoteVideo.autoplay = true;
+  remoteVideo.playsInline = true;
+  document.body.appendChild(remoteVideo);
+};
 
-        const pc = new RTCPeerConnection();
-        setPC(pc);
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket?.send(JSON.stringify({
-                    type: 'iceCandidate',
-                    candidate: event.candidate
-                }));
-            }
-        }
 
-        pc.onnegotiationneeded = async () => {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socket?.send(JSON.stringify({
-                type: 'createOffer',
-                sdp: pc.localDescription
-            }));
-        }
-            
-        getCameraStreamAndSend(pc);
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.send(JSON.stringify({
+        type: "iceCandidate",
+        candidate: event.candidate,
+      }));
     }
+  };
+
+  socket.onmessage = async (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === "createAnswer") {
+      await pc.setRemoteDescription(message.sdp);
+    } else if (message.type === "iceCandidate") {
+      await pc.addIceCandidate(message.candidate);
+    }
+  };
+
+  // Add local video/audio tracks
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+  // Show local preview
+  const localVideo = document.createElement("video");
+  localVideo.srcObject = stream;
+  localVideo.autoplay = true;
+  localVideo.muted = true;
+  document.body.appendChild(localVideo);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.send(JSON.stringify({ type: "createOffer", sdp: pc.localDescription }));
+};
 
     const getCameraStreamAndSend = (pc: RTCPeerConnection) => {
         navigator.mediaDevices.getUserMedia({ video: true, audio:true }).then((stream) => {
@@ -65,6 +76,7 @@ export const Sender = () => {
             });
         });
     }
+    
 
     return <div>
         Sender

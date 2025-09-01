@@ -1,71 +1,67 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function Receiver() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  // const [pc, setPc] = useState<RTCPeerConnection | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+
   useEffect(() => {
-    const socket = new WebSocket("ws://localhost:8080/ws");
+    const socket = new WebSocket("ws://localhost:8080");
     setSocket(socket);
+
     socket.onopen = () => {
-      console.log("WebSocket connection established");
+      console.log("Receiver: WebSocket connected");
       socket.send(JSON.stringify({ type: "receiver" }));
     };
-  }, []);
-  if (socket) {
-    // console.log("socket", socket);
+
     socket.onmessage = async (event) => {
       const message = JSON.parse(event.data);
-      let pc: RTCPeerConnection | null = null;
-      console.log("CONNECTION NEEDED!!!");
+
       if (message.type === "createOffer") {
-        pc = new RTCPeerConnection();
-        pc.setRemoteDescription(message.sdp);
+        const pc = new RTCPeerConnection();
+        pcRef.current = pc;
+
+        // Remote video/audio → Receiver
+        pc.ontrack = (event) => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+          }
+        };
+
         pc.onicecandidate = (event) => {
           if (event.candidate) {
-            socket.send(
-              JSON.stringify({
-                type: "iceCandidate",
-                candidate: event.candidate,
-              })
-            );
+            socket.send(JSON.stringify({ type: "iceCandidate", candidate: event.candidate }));
           }
         };
-        pc.ontrack = (event) => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = new MediaStream([event.track]);
-            videoRef.current.play();
-          }
-        };
+
+        // Local camera + mic → Sender
+        const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+        // Show local preview (muted so no echo)
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+        }
+
+        await pc.setRemoteDescription(message.sdp);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        socket.send(JSON.stringify({ type: "createAnswer", sdp: pc.localDescription }));
+      }
 
-        socket.send(
-          JSON.stringify({ type: "createAnswer", sdp: pc.localDescription })
-        );
-      } else if (message.type === "iceCandidate") {
-        if (pc! == null) {
-          //@ts-expect-error blah I don't care about this right now
-          await pc.addIceCandidate(message.candidate);
-        } else {
-          console.error("PeerConnection is not initialized");
-        }
+      if (message.type === "iceCandidate" && pcRef.current) {
+        await pcRef.current.addIceCandidate(message.candidate);
       }
     };
-  }
+  }, []);
+
   return (
-    <>
-      <div>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted // 🔥 this is the fix
-          controls={false}
-          style={{ width: "500px", height: "auto", backgroundColor: "black" }}
-        />
-      </div>
-    </>
+    <div>
+      <h3>Receiver</h3>
+      <video ref={localVideoRef} autoPlay muted playsInline style={{ width: "200px", background: "gray" }} />
+      <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "400px", background: "black" }} />
+    </div>
   );
 }
 

@@ -1,34 +1,28 @@
 import { WebSocket, WebSocketServer } from 'ws';
-
 const wss = new WebSocketServer({ port: 8080 });
 
-let senderSocket: null | WebSocket = null;
-let receiverSocket: null | WebSocket = null;
+const rooms: Record<string, { sender?: WebSocket, receiver?: WebSocket }> = {};
 
-wss.on('connection', function connection(ws) {
-  ws.on('error', console.error);
+wss.on('connection', (ws) => {
+  ws.on('message', (data) => {
+    const message = JSON.parse(data.toString());
+    const { type, room, sdp, candidate } = message;
 
-  ws.on('message', function message(data: any) {
-    const message = JSON.parse(data);
-    if (message.type === 'sender') {
-      senderSocket = ws;
-    } else if (message.type === 'receiver') {
-      receiverSocket = ws;
-    } else if (message.type === 'createOffer') {
-      if (ws !== senderSocket) {
-        return;
-      }
-      receiverSocket?.send(JSON.stringify({ type: 'createOffer', sdp: message.sdp }));
-    } else if (message.type === 'createAnswer') {
-        if (ws !== receiverSocket) {
-          return;
-        }
-        senderSocket?.send(JSON.stringify({ type: 'createAnswer', sdp: message.sdp }));
-    } else if (message.type === 'iceCandidate') {
-      if (ws === senderSocket) {
-        receiverSocket?.send(JSON.stringify({ type: 'iceCandidate', candidate: message.candidate }));
-      } else if (ws === receiverSocket) {
-        senderSocket?.send(JSON.stringify({ type: 'iceCandidate', candidate: message.candidate }));
+    if (!rooms[room]) rooms[room] = {};
+
+    if (type === 'sender') {
+      rooms[room].sender = ws;
+    } else if (type === 'receiver') {
+      rooms[room].receiver = ws;
+    } else if (type === 'createOffer' && rooms[room].receiver) {
+      rooms[room].receiver.send(JSON.stringify({ type: 'createOffer', sdp }));
+    } else if (type === 'createAnswer' && rooms[room].sender) {
+      rooms[room].sender.send(JSON.stringify({ type: 'createAnswer', sdp }));
+    } else if (type === 'iceCandidate') {
+      if (ws === rooms[room].sender && rooms[room].receiver) {
+        rooms[room].receiver.send(JSON.stringify({ type: 'iceCandidate', candidate }));
+      } else if (ws === rooms[room].receiver && rooms[room].sender) {
+        rooms[room].sender.send(JSON.stringify({ type: 'iceCandidate', candidate }));
       }
     }
   });

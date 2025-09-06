@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 function Receiver() {
-  //
-  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [sockets, setSocket] = useState<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -10,6 +9,7 @@ function Receiver() {
   useEffect(() => {
     const socket = new WebSocket("ws://localhost:8080");
     setSocket(socket);
+
 
     socket.onopen = () => {
       console.log("Receiver: WebSocket connected");
@@ -54,6 +54,7 @@ function Receiver() {
       if (message.type === "iceCandidate" && pcRef.current) {
         await pcRef.current.addIceCandidate(message.candidate);
       }
+      console.log(sockets)
     };
   }, []);
 

@@ -7,6 +7,7 @@ export const Sender = () => {
 
     useEffect(() => {
         const socket = new WebSocket('ws://localhost:8080');
+        console.log('Sender: WebSocket connected' + pc);
         setSocket(socket);
         socket.onopen = () => {
             socket.send(JSON.stringify({
